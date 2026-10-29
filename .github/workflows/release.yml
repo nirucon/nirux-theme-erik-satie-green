@@ -1,0 +1,41 @@
+name: Release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify theme files
+        run: |
+          test -f themes/niru-erik-satie-green.toml
+          test -f wallpapers/nirux-wallpaper-erik-satie-green-4k.png
+          python3 - <<'PY'
+          import tomllib
+          from pathlib import Path
+          theme = tomllib.loads(Path('themes/niru-erik-satie-green.toml').read_text())
+          for key in ('name', 'background', 'foreground', 'muted', 'border', 'focus'):
+              assert key in theme
+          pack = tomllib.loads(Path('themepack.toml').read_text())
+          assert pack['schema'] == 1
+          PY
+      - name: Package
+        run: |
+          version=${GITHUB_REF_NAME#v}
+          tmp=$(mktemp -d)
+          git archive --format=tar HEAD | tar -x -C "$tmp"
+          mkdir "$tmp/package"
+          cp -a "$tmp"/themes "$tmp"/wallpapers "$tmp"/themepack.toml "$tmp"/install.sh "$tmp"/uninstall.sh "$tmp"/README.md "$tmp/package/"
+          (cd "$tmp" && zip -qr "nirux-theme-erik-satie-green-$version.zip" package)
+          cp "$tmp/nirux-theme-erik-satie-green-$version.zip" .
+          sha256sum "nirux-theme-erik-satie-green-$version.zip" > SHA256SUMS
+          rm -rf "$tmp"
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            nirux-theme-erik-satie-green-*.zip
+            SHA256SUMS
+          generate_release_notes: true
